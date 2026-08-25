@@ -2,12 +2,19 @@ from flask import Flask, request
 import os
 import requests
 from google import genai
+import traceback
 
 app = Flask(__name__)
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 WHATSAPP_ACCESS_TOKEN = os.environ.get("WHATSAPP_ACCESS_TOKEN")
 PHONE_NUMBER_ID = os.environ.get("PHONE_NUMBER_ID")
+
+print("===== APP STARTED =====")
+print("GEMINI_API_KEY set:", bool(GEMINI_API_KEY))
+print("WHATSAPP_ACCESS_TOKEN set:", bool(WHATSAPP_ACCESS_TOKEN))
+print("PHONE_NUMBER_ID set:", bool(PHONE_NUMBER_ID))
+print("PHONE_NUMBER_ID value:", PHONE_NUMBER_ID)
 
 client = genai.Client(api_key=GEMINI_API_KEY)
 
@@ -25,60 +32,66 @@ def verify_webhook():
 
     if mode == "subscribe" and token == VERIFY_TOKEN:
         return challenge, 200
-
     return "Verification failed", 403
 
 @app.route("/webhook", methods=["POST"])
 def webhook():
+    print("\n\n========== NEW WEBHOOK REQUEST ==========")
     data = request.get_json()
-    print("Incoming data:", data)   # yeh important hai debugging ke liye
+    print("Full data:", data)
 
     try:
-        # Status updates ignore karo
-        if "messages" not in data["entry"][0]["changes"][0]["value"]:
+        value = data["entry"][0]["changes"][0]["value"]
+
+        if "messages" not in value:
+            print("→ Status update aaya, ignore kar raha hoon")
             return "OK", 200
 
-        message = data["entry"][0]["changes"][0]["value"]["messages"][0]
+        message = value["messages"][0]
         sender = message["from"]
+        msg_type = message.get("type")
 
-        # Sirf text messages handle karo
-        if message.get("type") != "text":
+        print("Sender:", sender)
+        print("Type:", msg_type)
+
+        if msg_type != "text":
+            print("→ Text message nahi hai, ignore")
             return "OK", 200
 
         user_message = message["text"]["body"]
         print("User message:", user_message)
 
+        print("→ Gemini ko bhej raha hoon...")
         response = client.models.generate_content(
             model="gemini-2.0-flash",
             contents=user_message
         )
 
         answer = response.text
-        print("Gemini answer:", answer)
+        print("Gemini ka jawab:", answer)
 
         url = f"https://graph.facebook.com/v21.0/{PHONE_NUMBER_ID}/messages"
-
         headers = {
             "Authorization": f"Bearer {WHATSAPP_ACCESS_TOKEN}",
             "Content-Type": "application/json"
         }
-
         payload = {
             "messaging_product": "whatsapp",
             "to": sender,
             "type": "text",
-            "text": {
-                "body": answer
-            }
+            "text": {"body": answer}
         }
 
-        result = requests.post(url, headers=headers, json=payload)
+        print("→ WhatsApp pe bhej raha hoon...")
+        result = requests.post(url, headers=headers, json=payload, timeout=20)
 
-        print("WhatsApp status:", result.status_code)
-        print("WhatsApp response:", result.text)
+        print("WhatsApp Status Code:", result.status_code)
+        print("WhatsApp Response Body:", result.text)
 
     except Exception as e:
-        print("Error:", str(e))
+        print("!!!!!!!!!! ERROR !!!!!!!!!!")
+        print(str(e))
+        traceback.print_exc()
 
     return "OK", 200
 
