@@ -1,4 +1,3 @@
-
 from flask import Flask, request
 import os
 import requests
@@ -14,11 +13,9 @@ client = genai.Client(api_key=GEMINI_API_KEY)
 
 VERIFY_TOKEN = "space_ai_verify_2026"
 
-
 @app.route("/")
 def home():
     return "Space AI is running successfully!"
-
 
 @app.route("/webhook", methods=["GET"])
 def verify_webhook():
@@ -31,24 +28,35 @@ def verify_webhook():
 
     return "Verification failed", 403
 
-
 @app.route("/webhook", methods=["POST"])
 def webhook():
     data = request.get_json()
+    print("Incoming data:", data)   # yeh important hai debugging ke liye
 
     try:
+        # Status updates ignore karo
+        if "messages" not in data["entry"][0]["changes"][0]["value"]:
+            return "OK", 200
+
         message = data["entry"][0]["changes"][0]["value"]["messages"][0]
         sender = message["from"]
+
+        # Sirf text messages handle karo
+        if message.get("type") != "text":
+            return "OK", 200
+
         user_message = message["text"]["body"]
+        print("User message:", user_message)
 
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-2.0-flash",
             contents=user_message
         )
 
         answer = response.text
+        print("Gemini answer:", answer)
 
-        url = f"https://graph.facebook.com/v25.0/{PHONE_NUMBER_ID}/messages"
+        url = f"https://graph.facebook.com/v21.0/{PHONE_NUMBER_ID}/messages"
 
         headers = {
             "Authorization": f"Bearer {WHATSAPP_ACCESS_TOKEN}",
@@ -70,12 +78,9 @@ def webhook():
         print("WhatsApp response:", result.text)
 
     except Exception as e:
-        print("Error:", e)
-        
-        print("Error:", e)
+        print("Error:", str(e))
 
     return "OK", 200
-
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
