@@ -36,7 +36,7 @@ def verify_webhook():
 def webhook():
     data = request.get_json()
 
-        try:
+    try:
         message = data["entry"][0]["changes"][0]["value"]["messages"][0]
         sender = message["from"]
         user_message = message["text"]["body"]
