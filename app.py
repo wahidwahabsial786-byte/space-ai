@@ -36,7 +36,7 @@ def verify_webhook():
 def webhook():
     data = request.get_json()
 
-    try:
+        try:
         message = data["entry"][0]["changes"][0]["value"]["messages"][0]
         sender = message["from"]
         user_message = message["text"]["body"]
@@ -64,14 +64,14 @@ def webhook():
             }
         }
 
-            result = requests.post(url, headers=headers, json=payload)
+        result = requests.post(url, headers=headers, json=payload)
 
-    print("WhatsApp status:", result.status_code)
-    print("WhatsApp response:", result.text)
-
-except Exception as e:
+        print("WhatsApp status:", result.status_code)
+        print("WhatsApp response:", result.text)
 
     except Exception as e:
+        print("Error:", e)
+        
         print("Error:", e)
 
     return "OK", 200
