@@ -1,22 +1,27 @@
 from flask import Flask, request
 import os
 import requests
-from google import genai
+from openai import OpenAI
 import traceback
 
 app = Flask(__name__)
 
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+# Environment variables
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 WHATSAPP_ACCESS_TOKEN = os.environ.get("WHATSAPP_ACCESS_TOKEN")
 PHONE_NUMBER_ID = os.environ.get("PHONE_NUMBER_ID")
 
 print("===== APP STARTED =====", flush=True)
-print("GEMINI_API_KEY set:", bool(GEMINI_API_KEY), flush=True)
+print("GROQ_API_KEY set:", bool(GROQ_API_KEY), flush=True)
 print("WHATSAPP_ACCESS_TOKEN set:", bool(WHATSAPP_ACCESS_TOKEN), flush=True)
 print("PHONE_NUMBER_ID set:", bool(PHONE_NUMBER_ID), flush=True)
 print("PHONE_NUMBER_ID value:", PHONE_NUMBER_ID, flush=True)
 
-client = genai.Client(api_key=GEMINI_API_KEY)
+# Groq client (OpenAI compatible)
+client = OpenAI(
+    api_key=GROQ_API_KEY,
+    base_url="https://api.groq.com/openai/v1"
+)
 
 VERIFY_TOKEN = "space_ai_verify_2026"
 
@@ -61,15 +66,28 @@ def webhook():
         user_message = message["text"]["body"]
         print("User message:", user_message, flush=True)
 
-        print("→ Gemini ko bhej raha hoon...", flush=True)
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=user_message
+        print("→ Groq ko bhej raha hoon...", flush=True)
+
+        response = client.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "Tum ek helpful aur friendly AI assistant ho. Short, clear aur natural jawab do. Urdu/English mix mein baat karo agar user aisa likhe."
+                },
+                {
+                    "role": "user",
+                    "content": user_message
+                }
+            ],
+            temperature=0.7,
+            max_tokens=1024
         )
 
-        answer = response.text
-        print("Gemini ka jawab:", answer, flush=True)
+        answer = response.choices[0].message.content
+        print("Groq ka jawab:", answer, flush=True)
 
+        # WhatsApp pe reply bhejo
         url = f"https://graph.facebook.com/v21.0/{PHONE_NUMBER_ID}/messages"
         headers = {
             "Authorization": f"Bearer {WHATSAPP_ACCESS_TOKEN}",
